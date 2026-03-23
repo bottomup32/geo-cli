@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.env
+data/
+tests/
+.git/
+.claude/
+*.md
+!requirements.txt

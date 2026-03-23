@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: geo-cli
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false  # Render dashboard에서 수동 입력
+      - key: GEO_DATA_DIR
+        value: /app/data
+      - key: GEO_MODEL
+        value: claude-sonnet-4-6
