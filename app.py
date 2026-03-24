@@ -170,7 +170,13 @@ if current_page == "💬 인터뷰":
             if comps: st.write(f"**경쟁사:** {', '.join(c.get('name','') for c in comps)}")
             plats = [pl for pl in bd.get("target_platforms",[]) if pl.get("enabled")]
             if plats: st.write(f"**플랫폼:** {', '.join(pl.get('name','') for pl in plats)}")
-            st.write(f"**쿼리:** {qs.get('target_count',75)}개 | {', '.join(lang_map.get(l,l) for l in qs.get('query_languages',[]))}")
+            _query_count = st.number_input(
+                "생성할 쿼리 수",
+                min_value=5, max_value=500, step=5,
+                value=qs.get("target_count", 75),
+                key="confirm_query_count",
+            )
+            st.caption(f"언어: {', '.join(lang_map.get(l,l) for l in qs.get('query_languages',[]))}")
             if qs.get('products'): st.write(f"**제품:** {', '.join(qs.get('products', []))}")
             if qs.get('keywords'): st.write(f"**키워드:** {', '.join(qs.get('keywords', []))}")
             st.write(f"**보고서:** {aud_map.get(rs.get('audience_level',''),'—')} / {lang_map.get(rs.get('language','ko'),'—')}")
@@ -189,6 +195,9 @@ if current_page == "💬 인터뷰":
                 from geo_cli.orchestrator.schema import AnalysisBrief, _generate_brief_id
                 from datetime import datetime, timezone
                 from geo_cli.utils.file_io import save_brief
+
+                # 사용자가 수정한 쿼리 수 반영
+                st.session_state.brief_dict.setdefault("query_settings", {})["target_count"] = st.session_state.get("confirm_query_count", 75)
 
                 brief = AnalysisBrief.from_dict(st.session_state.brief_dict)
                 if not brief.brief_id:
