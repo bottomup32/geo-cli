@@ -585,6 +585,14 @@ elif current_page == "📂 데이터":
     )
 
     brief_files = _list_briefs()
+
+    # 현재 세션의 brief가 이미 저장되었지만 목록에 없으면 추가
+    if st.session_state.get("brief"):
+        _cur = st.session_state.brief
+        _cur_path = DATA_DIR / f"brief_{_cur.brief_id}.json"
+        if _cur_path.exists() and _cur_path not in brief_files:
+            brief_files.insert(0, _cur_path)
+
     if not brief_files:
         st.info("저장된 브리프가 없습니다. 먼저 인터뷰를 완료하세요.")
     else:
@@ -594,7 +602,8 @@ elif current_page == "📂 데이터":
             bid = bf.stem.replace("brief_", "")
             try:
                 _brief = _load_brief(bid)
-            except Exception:
+            except Exception as _load_err:
+                st.warning(f"브리프 로드 실패 ({bf.name}): {_load_err}")
                 continue
 
             title = brief_display_title(_brief)

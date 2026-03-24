@@ -12,7 +12,8 @@ from pathlib import Path
 
 from geo_cli.orchestrator.schema import AnalysisBrief
 
-_DEFAULT_DATA_DIR = Path(os.getenv("GEO_DATA_DIR", "./data"))
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent  # geo_cli/utils/ → 프로젝트 루트
+_DEFAULT_DATA_DIR = Path(os.getenv("GEO_DATA_DIR", str(_PROJECT_ROOT / "data")))
 
 
 def _ensure_data_dir(data_dir: Path) -> Path:
