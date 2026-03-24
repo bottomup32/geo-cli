@@ -404,24 +404,71 @@ elif current_page == "▶ 파이프라인":
                 except ImportError:
                     _playwright_ok = False
 
-                if not _playwright_ok:
-                    st.warning("⚠️ 이 서버에서는 ChatGPT 테스트를 실행할 수 없습니다. (Playwright 미설치)\n\n로컬 환경에서 `python -m geo_cli` 로 실행하세요.")
-                else:
+                if _playwright_ok:
                     st.info("⚠️ 브라우저 창이 열립니다. ChatGPT 로그인 후 자동으로 쿼리가 실행됩니다.")
+                    if st.button("▶ ChatGPT 테스트 실행", type="primary", key="run_test"):
+                        from geo_cli.agents.testing_agent import TestingAgent
+                        geo_log.clear()
+                        try:
+                            result = _run_with_live_log(
+                                TestingAgent().run, brief, st.session_state.query_result
+                            )
+                            st.session_state.testing_result = result
+                            st.rerun()
+                        except Exception as e:
+                            import traceback
+                            st.error(f"오류: {e}")
+                            st.code(traceback.format_exc(), language="python")
 
-                if _playwright_ok and st.button("▶ ChatGPT 테스트 실행", type="primary", key="run_test"):
-                    from geo_cli.agents.testing_agent import TestingAgent
-                    geo_log.clear()
+                # ── 파일 업로드 (서버 배포 또는 로컬 실행 결과 가져오기)
+                st.divider()
+                st.markdown("**📤 로컬 테스트 결과 업로드**")
+                if not _playwright_ok:
+                    st.caption("이 서버에서는 브라우저 테스트를 실행할 수 없습니다. "
+                               "로컬에서 `python -m geo_cli`로 실행한 결과 JSON 파일을 업로드하세요.")
+                else:
+                    st.caption("로컬에서 별도로 실행한 결과가 있으면 여기에 업로드할 수 있습니다.")
+
+                uploaded = st.file_uploader(
+                    "테스트 결과 JSON 파일 (raw_chatgpt_*.json)",
+                    type=["json"], key="upload_testing",
+                )
+                if uploaded is not None:
                     try:
-                        result = _run_with_live_log(
-                            TestingAgent().run, brief, st.session_state.query_result
+                        from geo_cli.agents.testing_agent import (
+                            TestingResult, RawResponse,
                         )
+                        data = json.loads(uploaded.read().decode("utf-8"))
+                        responses = [
+                            RawResponse(
+                                query_id=r["query_id"],
+                                query_text=r["query_text"],
+                                platform=r.get("platform", "chatgpt"),
+                                response_text=r["response_text"],
+                                response_urls=r.get("response_urls", []),
+                                timestamp=r.get("timestamp", ""),
+                                status=r.get("status", "success"),
+                                error_message=r.get("error_message", ""),
+                            )
+                            for r in data.get("responses", [])
+                        ]
+                        result = TestingResult(
+                            brief_id=data.get("brief_id", brief.brief_id),
+                            platform=data.get("platform", "chatgpt"),
+                            responses=responses,
+                            total=data.get("total", len(responses)),
+                            success=data.get("success", sum(1 for r in responses if r.status == "success")),
+                            error=data.get("error", sum(1 for r in responses if r.status == "error")),
+                        )
+                        # 결과 저장
+                        from geo_cli.utils.file_io import _DEFAULT_DATA_DIR, atomic_write
+                        save_path = _DEFAULT_DATA_DIR / f"raw_chatgpt_{brief.brief_id}.json"
+                        atomic_write(save_path, json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
                         st.session_state.testing_result = result
+                        st.success(f"✅ 업로드 완료 — {result.success}/{result.total}건 성공")
                         st.rerun()
                     except Exception as e:
-                        import traceback
-                        st.error(f"오류: {e}")
-                        st.code(traceback.format_exc(), language="python")
+                        st.error(f"JSON 파싱 오류: {e}")
 
         st.divider()
 
