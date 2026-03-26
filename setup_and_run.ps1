@@ -15,7 +15,7 @@ if (-not $SkipInstall) {
     pip install -e .
     
     Write-Host "`n[2/3] Playwright Chromium 브라우저 설치 중..." -ForegroundColor Yellow
-    playwright install chromium
+    python -m playwright install chromium
 } else {
     Write-Host "`n[INFO] 설치 단계를 건너뜁니다." -ForegroundColor DarkGray
 }

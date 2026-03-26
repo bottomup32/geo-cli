@@ -54,32 +54,41 @@ async def health():
 
 
 @app.get("/api/pending-jobs")
-async def pending_jobs(x_api_key: str | None = Header(None)):
+def pending_jobs(x_api_key: str | None = Header(None)):
     """쿼리는 생성되었지만 테스트 결과가 없는 작업 목록 반환."""
+    import logging
+    logger = logging.getLogger("api_server")
+    logger.setLevel(logging.INFO)
+    
     _verify_key(x_api_key)
 
-    jobs = []
-    for qf in sorted(DATA_DIR.glob("queries_geo_*.json"), reverse=True):
-        bid = qf.stem.replace("queries_", "")
-        status = _pipeline_status(bid)
-        if status["queries"] and not status["testing"]:
-            # brief 정보 로드 (제목 등)
-            title = bid
-            brief_path = DATA_DIR / f"brief_{bid}.json"
-            if brief_path.exists():
-                try:
-                    with open(brief_path, "r", encoding="utf-8") as f:
-                        bd = json.load(f)
-                    title = bd.get("title") or bd.get("subject", {}).get("name", bid)
-                except Exception:
-                    pass
-            jobs.append({
-                "brief_id": bid,
-                "title": title,
-                "status": status,
-            })
+    try:
+        jobs = []
+        for qf in sorted(DATA_DIR.glob("queries_geo_*.json"), reverse=True):
+            bid = qf.stem.replace("queries_", "")
+            status = _pipeline_status(bid)
+            if status["queries"] and not status["testing"]:
+                # brief 정보 로드 (제목 등)
+                title = bid
+                brief_path = DATA_DIR / f"brief_{bid}.json"
+                if brief_path.exists():
+                    try:
+                        with open(brief_path, "r", encoding="utf-8") as f:
+                            bd = json.load(f)
+                        title = bd.get("title") or bd.get("subject", {}).get("name", bid)
+                    except Exception as parse_e:
+                        logger.warning(f"Failed to parse {brief_path}: {parse_e}")
+                
+                jobs.append({
+                    "brief_id": bid,
+                    "title": title,
+                    "status": status,
+                })
 
-    return {"pending": jobs, "count": len(jobs)}
+        return {"pending": jobs, "count": len(jobs)}
+    except Exception as e:
+        logger.error(f"Error in pending-jobs: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/download/{brief_id}")
