@@ -92,43 +92,62 @@ def pending_jobs(x_api_key: str | None = Header(None)):
 
 
 @app.get("/api/download/{brief_id}")
-async def download_data(brief_id: str, x_api_key: str | None = Header(None)):
-    """brief + queries JSON을 하나의 응답으로 반환."""
+def download_queries(brief_id: str, x_api_key: str | None = Header(None)):
+    """로컬 워커가 특정 brief_id의 쿼리 파일과 brief 파일을 다운로드."""
     _verify_key(x_api_key)
 
-    result: dict = {"brief_id": brief_id}
+    q_file = DATA_DIR / f"queries_{brief_id}.json"
+    b_file = DATA_DIR / f"brief_{brief_id}.json"
 
-    # Brief
-    bp = DATA_DIR / f"brief_{brief_id}.json"
-    if bp.exists():
-        with open(bp, "r", encoding="utf-8") as f:
-            result["brief"] = json.load(f)
-
-    # Queries
-    qp = DATA_DIR / f"queries_{brief_id}.json"
-    if not qp.exists():
+    if not q_file.exists():
         raise HTTPException(status_code=404, detail=f"queries not found: {brief_id}")
-    with open(qp, "r", encoding="utf-8") as f:
-        result["queries"] = json.load(f)
+    
+    # brief 정보는 없을 수도 있지만 있으면 포함
+    try:
+        with open(q_file, "r", encoding="utf-8") as f:
+            queries = json.load(f)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read queries: {e}")
 
-    return result
+    brief = None
+    if b_file.exists():
+        try:
+            with open(b_file, "r", encoding="utf-8") as f:
+                brief = json.load(f)
+        except Exception:
+            pass
+
+    return {
+        "brief_id": brief_id,
+        "queries": queries,
+        "brief": brief
+    }
 
 
 @app.post("/api/upload-results/{brief_id}")
-async def upload_results(brief_id: str, request: Request, x_api_key: str | None = Header(None)):
-    """로컬 Worker가 Testing 결과를 업로드."""
+def upload_results(brief_id: str, request: Request, x_api_key: str | None = Header(None)):
+    """로컬 워커가 수행한 검색/스크래핑 결과를 업로드."""
     _verify_key(x_api_key)
+    
+    import asyncio
+    try:
+        # Use asyncio.run to sync await request.json()
+        payload = asyncio.run(request.json())
+        results = payload.get("results")
+        if not results:
+            raise HTTPException(status_code=400, detail="No results provided")
 
-    body = await request.json()
-    save_path = DATA_DIR / f"raw_chatgpt_{brief_id}.json"
-    with open(save_path, "w", encoding="utf-8") as f:
-        json.dump(body, f, ensure_ascii=False, indent=2)
-
-    return {"status": "ok", "saved": str(save_path.name)}
+        out_file = DATA_DIR / f"test_results_{brief_id}.json"
+        with open(out_file, "w", encoding="utf-8") as f:
+            json.dump(results, f, ensure_ascii=False, indent=2)
+            
+        return {"status": "success", "message": f"Results saved for {brief_id}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/trigger-analysis/{brief_id}")
-async def trigger_analysis(brief_id: str, x_api_key: str | None = Header(None)):
+def trigger_analysis(brief_id: str, x_api_key: str | None = Header(None)):
     """테스트 결과 업로드 후 분석 + 보고서 생성을 트리거."""
     _verify_key(x_api_key)
 
