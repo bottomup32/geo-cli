@@ -4,7 +4,7 @@ WORKDIR /app
 
 # System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
+    build-essential curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Python dependencies (playwright excluded for cloud deployment)
@@ -18,15 +18,11 @@ COPY . .
 # Data directory
 RUN mkdir -p /app/data
 
-# Expose Streamlit default port
-EXPOSE 8501
+# Expose combined server port (Render uses PORT env, default 10000)
+EXPOSE 10000
 
-# Health check
-HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health || exit 1
+# Health check via FastAPI
+HEALTHCHECK CMD curl --fail http://localhost:10000/api/health || exit 1
 
-# Run Streamlit
-CMD ["streamlit", "run", "app.py", \
-     "--server.port=8501", \
-     "--server.address=0.0.0.0", \
-     "--server.headless=true", \
-     "--browser.gatherUsageStats=false"]
+# Run combined server (FastAPI + Streamlit)
+CMD ["python", "server.py"]
