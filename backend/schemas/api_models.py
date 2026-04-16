@@ -87,12 +87,14 @@ class SettingsResponse(BaseModel):
     api_key_preview: str
     model: str
     data_dir: str
+    chatgpt_profile_dir: str
     selectors: dict[str, str] = {}
 
 
 class SettingsUpdateRequest(BaseModel):
     api_key: str | None = None
     model: str | None = None
+    chatgpt_profile_dir: str | None = None
 
 
 class SelectorsUpdateRequest(BaseModel):

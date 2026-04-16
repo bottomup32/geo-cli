@@ -16,6 +16,8 @@ export default function InterviewPage() {
 
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'open' | 'closed'>('connecting')
+  const [sendError, setSendError] = useState('')
   const [queryCount, setQueryCount] = useState(75)
   const wsRef = useRef<WebSocket | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
@@ -30,6 +32,8 @@ export default function InterviewPage() {
   const connectWs = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return
 
+    setConnectionStatus('connecting')
+    setSendError('')
     const ws = createWebSocket(`/api/interview/ws/${sessionId}`, (data: InterviewEvent) => {
       switch (data.type) {
         case 'history':
@@ -48,17 +52,33 @@ export default function InterviewPage() {
           addChatMessage({ role: 'assistant', content: data.content })
           setStreamingText('')
           setSending(false)
+          setSendError('')
           break
         case 'interview_complete':
+          setSending(false)
           setInterviewDone(true, data.brief_dict)
           setQueryCount(data.brief_dict?.query_settings?.target_count ?? 75)
           break
         case 'error':
           setStreamingText('')
           setSending(false)
-          alert(data.message)
+          setSendError(data.message)
           break
       }
+    }, {
+      onOpen: () => {
+        setConnectionStatus('open')
+        setSendError('')
+      },
+      onClose: () => {
+        setConnectionStatus('closed')
+        setSending(false)
+      },
+      onError: () => {
+        setConnectionStatus('closed')
+        setSending(false)
+        setSendError('서버 연결이 끊어졌습니다. 다시 전송해 주세요.')
+      },
     })
     wsRef.current = ws
   }, [sessionId])
@@ -80,8 +100,17 @@ export default function InterviewPage() {
     addChatMessage({ role: 'user', content: text })
     setInput('')
     setSending(true)
+    setSendError('')
     setStreamingText('')
     wsRef.current.send(JSON.stringify({ type: 'message', content: text }))
+  }
+
+  const handleRetryConnection = () => {
+    wsRef.current?.close()
+    wsRef.current = null
+    setSending(false)
+    connectWs()
+    inputRef.current?.focus()
   }
 
   const handleApprove = async () => {
@@ -252,7 +281,28 @@ export default function InterviewPage() {
       {/* Chat input */}
       {!interviewDone && (
         <div className="border-t border-slate-200 px-8 py-4 bg-white">
-          <div className="flex gap-3 max-w-4xl mx-auto">
+          <div className="max-w-4xl mx-auto space-y-2">
+            {sending && (
+              <p className="text-xs text-slate-500">
+                AI 응답을 기다리는 중입니다. 오래 걸리거나 멈춘 것 같으면 아래 연결 재시도를 눌러 다시 입력할 수 있습니다.
+              </p>
+            )}
+            {connectionStatus !== 'open' && (
+              <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <span>
+                  {connectionStatus === 'connecting' ? '서버에 연결하는 중입니다...' : '서버 연결이 끊어졌습니다.'}
+                </span>
+                <button onClick={handleRetryConnection} className="font-medium underline">
+                  연결 재시도
+                </button>
+              </div>
+            )}
+            {sendError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                {sendError}
+              </div>
+            )}
+            <div className="flex gap-3">
             <input
               ref={inputRef}
               type="text"
@@ -270,6 +320,7 @@ export default function InterviewPage() {
             >
               {sending ? '...' : '전송'}
             </button>
+            </div>
           </div>
         </div>
       )}

@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import json
+import mimetypes
+import zipfile
+from io import BytesIO
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse, StreamingResponse
 
 from backend.config import DATA_DIR
 from backend.database.engine import SessionLocal
@@ -134,12 +137,44 @@ def list_artifacts(brief_id: str):
     ]
 
 
+@router.get("/{brief_id}/artifacts.zip")
+def download_artifacts_zip(brief_id: str):
+    from geo_cli.utils.file_io import list_artifacts as file_list_artifacts
+
+    artifacts = file_list_artifacts(brief_id)
+    if not artifacts:
+        raise HTTPException(404, "Artifacts not found")
+
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for artifact in artifacts:
+            path = artifact.path
+            if path.exists() and path.resolve().is_relative_to(DATA_DIR.resolve()):
+                zf.write(path, arcname=path.name)
+
+    buffer.seek(0)
+    headers = {
+        "Content-Disposition": f'attachment; filename="geo_artifacts_{brief_id}.zip"',
+        "Cache-Control": "no-store, max-age=0",
+    }
+    return StreamingResponse(buffer, media_type="application/zip", headers=headers)
+
+
 @router.get("/{brief_id}/artifacts/{filename}")
-def download_artifact(brief_id: str, filename: str):
+def download_artifact(
+    brief_id: str,
+    filename: str,
+    download: bool = Query(False),
+):
     filepath = DATA_DIR / filename
     if not filepath.exists():
         raise HTTPException(404, f"File not found: {filename}")
     # Security: ensure the file is in DATA_DIR
     if not filepath.resolve().is_relative_to(DATA_DIR.resolve()):
         raise HTTPException(403, "Access denied")
-    return FileResponse(filepath, filename=filename)
+
+    media_type = mimetypes.guess_type(str(filepath))[0] or "application/octet-stream"
+    headers = {"Cache-Control": "no-store, max-age=0"}
+    if download:
+        headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return FileResponse(filepath, media_type=media_type, filename=filename if download else None, headers=headers)

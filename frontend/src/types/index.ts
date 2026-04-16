@@ -67,6 +67,7 @@ export interface Settings {
   api_key_preview: string
   model: string
   data_dir: string
+  chatgpt_profile_dir: string
   selectors: Record<string, string>
 }
 

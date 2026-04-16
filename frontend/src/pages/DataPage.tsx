@@ -157,6 +157,14 @@ export default function DataPage() {
                       >
                         📂 {t.resumeWork}
                       </button>
+                      <a
+                        href={api.getArtifactsZipUrl(brief.id)}
+                        download={`geo_artifacts_${brief.id}.zip`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="px-4 py-2 bg-slate-900 text-white text-sm rounded-lg hover:bg-slate-800"
+                      >
+                        ⬇ 전체 ZIP 다운로드
+                      </a>
                       <button
                         onClick={() => handleDelete(brief.id)}
                         className="px-4 py-2 bg-red-50 text-red-600 text-sm rounded-lg hover:bg-red-100"
@@ -166,7 +174,10 @@ export default function DataPage() {
                     </div>
 
                     {/* Artifacts */}
-                    <h4 className="text-xs font-medium text-slate-500 uppercase mb-2">{t.artifacts}</h4>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-xs font-medium text-slate-500 uppercase">{t.artifacts}</h4>
+                      <p className="text-[11px] text-slate-400">CSV 파일은 Excel에서 열 수 있는 UTF-8 형식입니다.</p>
+                    </div>
                     {(!artifacts[brief.id] || artifacts[brief.id].length === 0) ? (
                       <p className="text-xs text-slate-400">{t.noArtifacts}</p>
                     ) : (
@@ -182,12 +193,12 @@ export default function DataPage() {
                               👁 {t.preview}
                             </button>
                             <a
-                              href={api.getArtifactUrl(brief.id, art.filename)}
+                              href={api.getArtifactDownloadUrl(brief.id, art.filename)}
                               download={art.filename}
-                              className="px-2 py-1 bg-slate-100 rounded hover:bg-slate-200"
+                              className="px-2 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              ⬇️
+                              ⬇ 다운로드
                             </a>
                           </div>
                         ))}

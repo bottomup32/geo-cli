@@ -112,14 +112,12 @@ class TestingResult:
 # ChatGPT scraper
 # ---------------------------------------------------------------------------
 
-_SESSION_FILE = None  # 런타임에 결정 (Path.home() 사용)
-
-
-def _get_session_file():
-    from pathlib import Path
-    p = Path.home() / ".geo_cli" / "chatgpt_session.json"
-    p.parent.mkdir(parents=True, exist_ok=True)
-    return p
+def _get_profile_dir() -> Path:
+    profile_dir = Path(os.getenv("GEO_CHATGPT_PROFILE_DIR", "")).expanduser()
+    if not str(profile_dir):
+        profile_dir = Path.home() / ".geo_cli" / "chatgpt_profile"
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    return profile_dir
 
 
 class ChatGPTScraper:
@@ -144,43 +142,32 @@ class ChatGPTScraper:
         geo_log.info("Playwright 브라우저 시작 중...")
         self._pw = sync_playwright().start()
 
-        # 일반 launch() 사용 — persistent_context의 "existing session" 충돌 없음
-        self._browser = self._pw.chromium.launch(
+        geo_log.info("ChatGPT 테스트용 Chromium 창을 엽니다. 창이 보이지 않으면 작업 표시줄 또는 Alt+Tab을 확인하세요.")
+        profile_dir = _get_profile_dir()
+        geo_log.info(f"ChatGPT 로그인 전용 프로필 사용: {profile_dir}")
+        self._context = self._pw.chromium.launch_persistent_context(
+            user_data_dir=str(profile_dir),
             headless=self._headless,
+            viewport={"width": 1280, "height": 900},
             args=[
                 "--no-sandbox",
                 "--disable-blink-features=AutomationControlled",
+                "--start-maximized",
             ],
             ignore_default_args=["--enable-automation"],
-        )
-
-        # 이전 로그인 세션(storage_state) 복원
-        session_file = _get_session_file()
-        if session_file.exists():
-            geo_log.info(f"저장된 세션 로드: {session_file}")
-        storage_state = str(session_file) if session_file.exists() else None
-
-        self._context = self._browser.new_context(
-            viewport={"width": 1280, "height": 900},
-            storage_state=storage_state,
         )
         # 모든 페이지에 webdriver 플래그 숨김 적용
         self._context.add_init_script(
             "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
         )
-        self._page = self._context.new_page()
+        self._page = self._context.pages[0] if self._context.pages else self._context.new_page()
+        self._page.bring_to_front()
         geo_log.ok("브라우저 준비 완료")
 
     def stop(self) -> None:
-        # 종료 전 세션 저장 — 다음 실행 시 재로그인 불필요
+        # Persistent context가 쿠키/로컬스토리지/로그인 상태를 프로필 폴더에 저장한다.
         if self._context:
-            try:
-                self._context.storage_state(path=str(_get_session_file()))
-            except Exception:
-                pass
             self._context.close()
-        if self._browser:
-            self._browser.close()
         if self._pw:
             self._pw.stop()
 
@@ -190,6 +177,7 @@ class ChatGPTScraper:
 
         geo_log.info(f"ChatGPT.com 접속 중: {_CHATGPT_URL}")
         self._page.goto(_CHATGPT_URL)
+        self._page.bring_to_front()
         self._page.wait_for_load_state("domcontentloaded", timeout=20_000)
         time.sleep(2.0)  # 페이지 안정화 대기
         geo_log.info("페이지 로드 완료 — 로그인 상태 확인 중...")
@@ -211,12 +199,7 @@ class ChatGPTScraper:
             time.sleep(3.0)
             if self._is_logged_in():
                 geo_log.ok("로그인 확인됨!")
-                # 로그인 직후 세션 즉시 저장
-                try:
-                    self._context.storage_state(path=str(_get_session_file()))
-                    geo_log.info("세션 저장 완료 — 다음 실행 시 자동 로그인됩니다.")
-                except Exception:
-                    pass
+                geo_log.info("로그인 상태가 전용 브라우저 프로필에 저장됩니다. 다음 실행부터 자동으로 재사용합니다.")
                 self._ensure_websearch_enabled()
                 return
             elapsed = int(time.time() - start_time)

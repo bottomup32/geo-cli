@@ -19,3 +19,7 @@ geo_cli.db
 # Frontend
 frontend/node_modules/
 frontend/dist/
+
+# Local browser profile for ChatGPT testing
+.geo_cli/
+chatgpt_profile/

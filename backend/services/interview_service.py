@@ -68,7 +68,7 @@ class InterviewService:
 
         session.messages.append({"role": "user", "content": user_text})
 
-        client = anthropic.Anthropic(api_key=api_key)
+        client = anthropic.Anthropic(api_key=api_key, timeout=60.0)
         messages = [{"role": m["role"], "content": m["content"]} for m in session.messages]
 
         full_response = ""
@@ -116,8 +116,12 @@ class InterviewService:
 
         except anthropic.APIStatusError as e:
             yield {"type": "error", "message": f"API 오류: {e}"}
+        except (anthropic.APIConnectionError, anthropic.APITimeoutError) as e:
+            yield {"type": "error", "message": f"API 연결 오류: {e}"}
         except (ValueError, json.JSONDecodeError) as e:
             yield {"type": "error", "message": f"JSON 파싱 오류: {e}. 계속 대화하세요."}
+        except Exception as e:
+            yield {"type": "error", "message": f"예상치 못한 오류: {e}"}
 
 
 # Global singleton

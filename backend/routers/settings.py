@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import re
+from pathlib import Path
 
 from dotenv import set_key
 from fastapi import APIRouter
@@ -42,11 +43,13 @@ def _read_selectors() -> dict[str, str]:
 def get_settings():
     api_key = os.getenv("ANTHROPIC_API_KEY", "")
     model = os.getenv("GEO_MODEL", "claude-sonnet-4-6")
+    profile_dir = os.getenv("GEO_CHATGPT_PROFILE_DIR", "~/.geo_cli/chatgpt_profile")
     return SettingsResponse(
         api_key_set=bool(api_key),
         api_key_preview=f"...{api_key[-8:]}" if len(api_key) > 8 else ("설정됨" if api_key else ""),
         model=model,
         data_dir=str(DATA_DIR),
+        chatgpt_profile_dir=str(Path(profile_dir).expanduser()),
         selectors=_read_selectors(),
     )
 
@@ -61,6 +64,10 @@ def update_settings(req: SettingsUpdateRequest):
     if req.model is not None:
         set_key(str(ENV_FILE), "GEO_MODEL", req.model)
         os.environ["GEO_MODEL"] = req.model
+    if req.chatgpt_profile_dir is not None:
+        profile_dir = req.chatgpt_profile_dir.strip()
+        set_key(str(ENV_FILE), "GEO_CHATGPT_PROFILE_DIR", profile_dir)
+        os.environ["GEO_CHATGPT_PROFILE_DIR"] = profile_dir
     return {"status": "ok"}
 
 
@@ -79,9 +86,10 @@ def update_selectors(req: SelectorsUpdateRequest):
     for label, new_val in req.selectors.items():
         var = _SEL_VARS.get(label)
         if var:
+            escaped_val = new_val.replace("\\", "\\\\").replace('"', '\\"')
             content = re.sub(
                 rf'^({var}\s*=\s*")(.+?)(")',
-                rf'\g<1>{re.escape(new_val)}\3',
+                lambda match, val=escaped_val: f"{match.group(1)}{val}{match.group(3)}",
                 content,
                 flags=re.MULTILINE,
             )

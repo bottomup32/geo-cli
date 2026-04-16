@@ -34,7 +34,7 @@ class LogBroadcaster:
     async def broadcast_loop(self, brief_id: str):
         from geo_cli.utils.stream_log import geo_log
 
-        while self._active.get(brief_id, False):
+        while self._active.get(brief_id, False) or self._connections.get(brief_id):
             lines = geo_log.get_all()
             last = self._last_index.get(brief_id, 0)
             new_lines = lines[last:]

@@ -9,6 +9,7 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [apiKey, setApiKey] = useState('')
   const [model, setModel] = useState('')
+  const [chatgptProfileDir, setChatgptProfileDir] = useState('')
   const [selectors, setSelectors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -16,6 +17,7 @@ export default function SettingsPage() {
     api.getSettings().then((data) => {
       setSettings(data)
       setModel(data.model)
+      setChatgptProfileDir(data.chatgpt_profile_dir)
       setSelectors(data.selectors)
     })
   }, [])
@@ -23,13 +25,17 @@ export default function SettingsPage() {
   const handleSaveApi = async () => {
     setMessage(null)
     try {
-      const updates: { api_key?: string; model?: string } = { model }
+      const updates: { api_key?: string; model?: string; chatgpt_profile_dir?: string } = {
+        model,
+        chatgpt_profile_dir: chatgptProfileDir,
+      }
       if (apiKey) updates.api_key = apiKey
       await api.updateSettings(updates)
-      setMessage({ type: 'success', text: '✅ 저장 완료. 앱 재시작 후 적용됩니다.' })
+      setMessage({ type: 'success', text: '✅ 저장 완료. 실행 중인 작업에는 재시작 후 적용됩니다.' })
       // Refresh settings
       const data = await api.getSettings()
       setSettings(data)
+      setChatgptProfileDir(data.chatgpt_profile_dir)
       setApiKey('')
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message })
@@ -87,6 +93,20 @@ export default function SettingsPage() {
         </div>
 
         <div className="mb-4">
+          <label className="block text-sm font-medium text-slate-600 mb-1.5">ChatGPT 로그인 프로필</label>
+          <input
+            type="text"
+            value={chatgptProfileDir}
+            onChange={(e) => setChatgptProfileDir(e.target.value)}
+            placeholder="~/.geo_cli/chatgpt_profile"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <p className="text-xs text-slate-500 mt-1">
+            Testing Agent가 띄우는 Chromium 전용 프로필입니다. 이 창에서 한 번 로그인하면 다음 실행부터 재사용됩니다.
+          </p>
+        </div>
+
+        <div className="mb-4">
           <label className="block text-sm font-medium text-slate-600 mb-1.5">{t.dataDir}</label>
           <input
             type="text"
@@ -108,6 +128,9 @@ export default function SettingsPage() {
       <section className="bg-white border border-slate-200 rounded-xl p-6 mb-6">
         <h2 className="text-lg font-semibold mb-1">🤖 {t.domSelectors}</h2>
         <p className="text-xs text-slate-500 mb-4">{t.domSelectorsDesc}</p>
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 mb-4">
+          ChatGPT UI가 바뀌어 Testing Agent가 입력/전송/응답을 못 찾을 때만 수정하세요. 저장 후 실행 중인 서버/작업에는 재시작이 필요할 수 있습니다.
+        </div>
 
         <div className="space-y-3">
           {Object.entries(selectors).map(([label, value]) => (

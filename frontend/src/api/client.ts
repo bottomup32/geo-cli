@@ -15,7 +15,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   // Settings
   getSettings: () => request<any>('/settings'),
-  updateSettings: (data: { api_key?: string; model?: string }) =>
+  updateSettings: (data: { api_key?: string; model?: string; chatgpt_profile_dir?: string }) =>
     request<any>('/settings', { method: 'PUT', body: JSON.stringify(data) }),
   getSelectors: () => request<Record<string, string>>('/settings/selectors'),
   updateSelectors: (selectors: Record<string, string>) =>
@@ -41,6 +41,9 @@ export const api = {
   deleteBrief: (id: string) => request<any>(`/briefs/${id}`, { method: 'DELETE' }),
   listArtifacts: (id: string) => request<any[]>(`/briefs/${id}/artifacts`),
   getArtifactUrl: (id: string, filename: string) => `${BASE}/briefs/${id}/artifacts/${filename}`,
+  getArtifactDownloadUrl: (id: string, filename: string) =>
+    `${BASE}/briefs/${id}/artifacts/${filename}?download=1`,
+  getArtifactsZipUrl: (id: string) => `${BASE}/briefs/${id}/artifacts.zip`,
 
   // Pipeline
   runStage: (briefId: string, stage: string) =>
