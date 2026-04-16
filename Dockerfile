@@ -4,29 +4,29 @@ WORKDIR /app
 
 # System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential curl nginx \
+    build-essential curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Python dependencies (playwright excluded for cloud deployment)
+# Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
-    && pip uninstall -y playwright 2>/dev/null; true
-
-# Copy Nginx configuration
-COPY nginx.conf /etc/nginx/sites-available/default
+    && playwright install chromium \
+    && playwright install-deps
 
 # Application code
 COPY . .
 
-# Data directory and execution permissions
+# Data directory
 RUN mkdir -p /app/data
-RUN chmod +x start.sh
 
-# Expose combined server port (Render uses PORT env, default 10000)
-EXPOSE 10000
+# Ensure data directory has write permissions
+RUN chmod -R 777 /app/data
 
-# Health check via FastAPI
-HEALTHCHECK CMD curl --fail http://localhost:10000/api/health || exit 1
+# Expose Streamlit port
+EXPOSE 8501
 
-# Run combined server (Nginx + FastAPI + Streamlit)
-CMD ["./start.sh"]
+# Health check
+HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health || exit 1
+
+# Run the application
+CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
